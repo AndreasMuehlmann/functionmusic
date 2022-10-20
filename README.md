@@ -16,9 +16,9 @@ higher is the frequencey for the played tone at second x. The function is define
 - A sign, possible is a static line, which stays at the same place to show at which moment you are by the function
   -> So that the timeline on the left always shows the current state of time
   
-  ## To-Do
+ ## To-Do
   
-  - draw window
-  - function calculator
-  - frequence dependencie to time
-  - 
+ - draw window
+ - function calculator
+ - frequence dependencie to time
+ - 
