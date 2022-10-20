@@ -6,9 +6,9 @@ higher is the frequencey for the played tone at second x. The function is define
 
 ## How to start
 
-- install Rust
-- clone repository
-- cargo run
+1. install Rust
+2. clone repository
+3. cargo run
 
 ## Goals
 
