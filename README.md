@@ -4,6 +4,11 @@ A project in which we draw a function in a coordinate system, where the x - axis
 while the y - axis stands for the frequence. So, the higher the value that comes out for y in the function, the 
 higher is the frequencey for the played tone at second x. The function is defined in code and only can changed there.
 
+## Example
+
+![grafik](https://user-images.githubusercontent.com/100072844/197040723-cb331334-062d-47a7-951b-46931a1d3ce7.png)
+
+
 ## How to start
 
 1. install Rust
