@@ -78,17 +78,25 @@ constant :: Float -> SoundFunction
 constant value x = value
 
 linear :: Float -> Float -> SoundFunction
-linear sloap yIntercept x = sloap * x + yIntercept
+linear sloap offset x = sloap * x + offset
 
 parabel :: Float -> Float -> SoundFunction
-parabel koefficient yIntercept x = koefficient * x * x + yIntercept
+parabel koefficient offset x = koefficient * x * x + offset
+
+sinus :: Float -> Float -> Float -> SoundFunction
+sinus amplitude freq offset x = amplitude * sin (freq * 2 * pi * x) + offset
 
 volume :: Float
 volume = 0.2
 
+repeatList :: Int -> [a] -> [a]
+repeatList repetitions list = concatMap (const list) [1 .. repetitions]
+
 composition :: [Pulse]
-composition = semitonesAsPulses parabelSemitones
-  where parabelSemitones = functionAsSemitones (parabel 1 (-2)) (-3) 6
+composition =  zipWith (+) (repeatList 12 (semitonesAsPulses parabelSemitones)) (zipWith (+) (semitonesAsPulses sinusSemitones2) $ semitonesAsPulses sinusSemitones)
+  where parabelSemitones = functionAsSemitones (parabel 20 (-8)) (-0.5) 1
+        sinusSemitones = functionAsSemitones (sinus 6 0.1 0) 0 6
+        sinusSemitones2 = functionAsSemitones (sinus 4 0.3 0) 0 6
 
 saveAsCsv :: FilePath -> IO ()
 saveAsCsv filePath = do
