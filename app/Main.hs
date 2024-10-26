@@ -25,20 +25,14 @@ type Phase = Float
 
 type Wave = (Hz, Phase)
 
--- freq :: Hz -> Seconds -> [Pulse]
--- freq hz duration =
---   map (* volume) $ zipWith3 (\x y z -> x * y * z) release attack output
---   where
---     step = (hz * 2 * pi) / sampleRate
---
---     attack :: [Pulse]
---     attack = map (min 1.0) [0.0, 0.001 ..]
---
---     release :: [Pulse]
---     release = reverse $ take (length output) attack
---
---     output :: [Pulse]
---     output = map (sin . (* step)) [0.0 .. sampleRate * duration]
+attackFactors :: [Pulse] -> [Float]
+attackFactors pulses = zipWith (*) (map (const 1) pulses) (map (min 1.0) [0.0, 0.001 ..])
+
+withAttack :: [Pulse] -> [Pulse]
+withAttack pulses = zipWith (*) pulses $ attackFactors pulses
+
+withRelease :: [Pulse] -> [Pulse]
+withRelease pulses = zipWith (*) pulses $ reverse $ attackFactors pulses
 
 sampleRate :: Samples
 sampleRate = 48000.0
@@ -69,10 +63,10 @@ semitonesAsPulsesHelper (semitone : semitones) prevWave prevX = pulse : semitone
     (pulse, wave, nextX) = nextPulse prevWave prevX (semitoneToFrequency semitone)
 
 semitonesAsPulses :: [Semitone] -> [Pulse]
-semitonesAsPulses semitones = semitonesAsPulsesHelper semitones (pitchStandard, 0.0) 0.0
+semitonesAsPulses semitones = withRelease $ withAttack $ semitonesAsPulsesHelper semitones (pitchStandard, 0.0) 0.0
 
 functionAsSemitones :: SoundFunction -> Float -> Seconds -> [Semitone]
-functionAsSemitones soundFunction from duration = map (soundFunction . (+ from) . (/ sampleRate)) [ 0.0 .. sampleRate * duration]
+functionAsSemitones soundFunction from duration = map (soundFunction . (+ from) . (/ sampleRate)) [0.0 .. sampleRate * duration]
 
 constant :: Float -> SoundFunction
 constant value x = value
@@ -80,8 +74,8 @@ constant value x = value
 linear :: Float -> Float -> SoundFunction
 linear sloap offset x = sloap * x + offset
 
-parabel :: Float -> Float -> SoundFunction
-parabel koefficient offset x = koefficient * x * x + offset
+parabel :: Float -> Float -> Float -> SoundFunction
+parabel verticalScaling horizontalScaling offset x = verticalScaling * (x * horizontalScaling) * (x * horizontalScaling) + offset
 
 sinus :: Float -> Float -> Float -> SoundFunction
 sinus amplitude freq offset x = amplitude * sin (freq * 2 * pi * x) + offset
@@ -93,20 +87,35 @@ repeatList :: Int -> [a] -> [a]
 repeatList repetitions list = concatMap (const list) [1 .. repetitions]
 
 composition :: [Pulse]
-composition =  zipWith (+) (repeatList 12 (semitonesAsPulses parabelSemitones)) (zipWith (+) (semitonesAsPulses sinusSemitones2) $ semitonesAsPulses sinusSemitones)
-  where parabelSemitones = functionAsSemitones (parabel 20 (-8)) (-0.5) 1
-        sinusSemitones = functionAsSemitones (sinus 6 0.1 0) 0 6
-        sinusSemitones2 = functionAsSemitones (sinus 4 0.3 0) 0 6
+composition = zipWith (+) (repeatList 12 (semitonesAsPulses parabelSemitones)) (zipWith (+) (semitonesAsPulses sinusSemitones2) $ semitonesAsPulses sinusSemitones)
+  where
+    parabelSemitones = functionAsSemitones (parabel 20 (-8) 1) (-0.5) 1
+    sinusSemitones = functionAsSemitones (sinus 6 0.1 0) 0 6
+    sinusSemitones2 = functionAsSemitones (sinus 4 0.3 0) 0 6
+
+composition2 :: [Pulse]
+composition2 = repeatList 2 (semitonesAsPulses (parabelSemitones ++ map (const 0) [0 .. sampleRate / 4])) ++
+               repeatList 2 (semitonesAsPulses (parabelSemitones2 ++ map (const 0) [0 .. sampleRate / 16])) ++
+               repeatList 2 (semitonesAsPulses constSemitones ++ map (const 0) [0 .. sampleRate / 16]) ++
+               repeatList 2 (semitonesAsPulses (parabelSemitones ++ map (const 0) [0 .. sampleRate / 4]))
+  where
+    parabelSemitones = functionAsSemitones (parabel 5.0 5.0 (-3.0)) (-0.1) 0.4
+    parabelSemitones2 = functionAsSemitones (parabel 5.0 5.0 2.0) (-0.2) 0.4
+    constSemitones = functionAsSemitones (const 0) 0 0.3
 
 saveAsCsv :: FilePath -> IO ()
 saveAsCsv filePath = do
   let contents = unlines $ zipWith (++) (map (++ ",") xs) pulses
   writeFile filePath contents
-  where pulses = map show composition
-        xs     = map (show . (/ sampleRate)) [0.0 .. fromIntegral (length pulses)]
+  where
+    pulses = map show composition
+    xs = map (show . (/ sampleRate)) [0.0 .. fromIntegral (length pulses)]
+
+clamp :: Float -> Float
+clamp value = if value > 1.0 then 1.0 else max value (-1.0)
 
 save :: FilePath -> IO ()
-save filePath = B.writeFile filePath $ BB.toLazyByteString $ foldMap (BB.floatLE . (volume *)) composition
+save filePath = B.writeFile filePath $ BB.toLazyByteString $ foldMap (BB.floatLE . (volume *) . clamp) composition2
 
 play :: IO ()
 play = do
